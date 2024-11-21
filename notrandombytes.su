@@ -1,0 +1,6 @@
+notrandombytes.c:159:12:crypto_rng	856	static
+notrandombytes.c:198:6:resetrandombytes	8	static
+notrandombytes.c:203:6:randombytes	32	static
+notrandombytes.c:205:6:resetrandombytes1	8	static
+notrandombytes.c:210:6:randombytes1	32	static
+notrandombytes.c:218:10:__jasmin_syscall_randombytes__	16	static

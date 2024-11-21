@@ -1,0 +1,33 @@
+require "params.jinc"
+
+
+
+
+
+fn decode_o(reg ptr u8[MAYO_2_O_bytes] m, reg ptr u8[2 * MAYO_2_O_bytes] mdec_p)->reg ptr u8[2 * MAYO_2_O_bytes]
+{
+     inline int i mdeclen; 
+     reg u8 tmp;
+
+     mdeclen = 2 * MAYO_2_O_bytes;
+
+     for i = 0 to mdeclen/2{
+          tmp = m[i];
+          tmp = tmp & 0xf;
+
+          mdec_p[i * 2] = tmp;
+
+          tmp = m[i];
+          tmp = tmp >> 4;
+          mdec_p[i * 2 + 1] = tmp;
+     }
+     if ((mdeclen % 2) ==1)
+     {
+          tmp = m[i];
+          tmp = tmp & 0xf;
+          mdec_p[mdeclen - 1] = tmp;
+     }
+     return mdec_p;
+
+}
+

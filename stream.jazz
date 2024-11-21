@@ -1,0 +1,87 @@
+require "aes.jinc"
+u128 perm = (16u8)[0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15];
+u8[16] seed_pk_g = {0x5b, 0x61, 0x42, 0x1e, 0xdc, 0x1c, 0x90, 0xef, 0xaf, 0x60, 0x75, 0x56, 0x0f, 0x02, 0x06, 0x17
+};
+/* Big-endian encoding of the counter */
+inline
+fn pack2u64(reg u64[2] x) -> reg u128 {
+  reg u128 r;
+  r = (128u)x[0];
+  r = #VPINSR_2u64(r, x[1], 1);
+  r = #VPSHUFB(r, perm);
+  return r;
+}
+
+inline
+fn pack2u64key(reg u64[2] x) -> reg u128 {
+  reg u128 r;
+  r = (128u)x[0];
+  r = #VPINSR_2u64(r, x[1], 1);
+  return r;
+}
+
+/* Increment the 128-bit counter */
+inline
+fn inc128(reg u64[2] x) -> reg u64[2] {
+  reg bool c;
+  c, x[0] += 1;
+  _, x[1] += 0 + c;
+  return x;
+}
+/* In-place encryption/decryption.
+
+Security annotations: message length and pointers are assumed to be public;
+the data targetted by these pointers is not assumed to be public.
+*/
+
+fn aes128ctr(#public reg ptr u64[11640] stream, reg ptr u64[2] seed_pk_64) -> #public reg ptr u64[11640] {
+  // Initialisation vector
+  stream = stream;
+  reg u64[2] iv;
+  iv[0] = 0;
+  iv[1] = 0;
+  
+  reg u64[2] seed_pk_64_r;
+  seed_pk_64_r[0] = seed_pk_64[0];
+  seed_pk_64_r[1] = seed_pk_64[1];
+
+
+  // Secret key
+  reg u128 sk;
+  sk = pack2u64key(seed_pk_64_r);
+
+  // Round keys, aka key schedule
+  reg u128[11] rkeys;
+  #inline
+  rkeys = keys_expand(sk);
+
+   // Number of full blocks
+  reg u64 nblocks;
+  nblocks = 5820;
+
+  // Position in the data stream
+  reg u64 i;
+  i = 0;
+
+  // Process complete blocks
+  while (nblocks > 0) {
+    reg u128 mask;
+    reg u64 tmp;
+
+    mask = pack2u64(iv);
+    mask = aes_rounds(rkeys, mask);
+    
+    iv = inc128(iv);
+
+    tmp = #VPEXTR(mask, 0);  
+    stream[i] = tmp;  
+    i += 1;
+    tmp = #VPEXTR(mask, 1);  
+    stream[i] = tmp;      
+    i += 1;
+
+  nblocks -= 1;
+ }
+  
+  return stream;
+}

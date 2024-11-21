@@ -1,0 +1,30 @@
+require "params.jinc"
+require "ffarith.jazz"
+
+u8[F_TAIL_LEN] f_tail = {
+    0x08, 0x00, 0x02, 0x08, 0x00
+};
+
+
+inline fn reduce_y_mod_fX_ver(stack u8[2 * paramm] y_s)->stack u8[2 * paramm]{
+    inline int i j; reg u64 tmp tmp1;
+
+    for i = (paramm + paramk * (paramk + 1) / 2 - 2) downto paramm - 1{
+        for j = 0 to F_TAIL_LEN{
+            tmp = (64u)y_s[i];
+            tmp1 = (64u)f_tail[j];
+            tmp = gf16_mul(tmp, tmp1);
+            tmp1 = (64u)y_s[i - paramm + j];
+            tmp1 ^= tmp;
+            tmp = tmp1;
+            tmp1 = i;
+            tmp1 -= paramm;
+            tmp1 += j;
+
+            y_s[tmp1] = tmp;
+
+        }
+        y_s[i] = 0;
+    }
+    return y_s;
+}

@@ -1,0 +1,36 @@
+param int MAYO_2_sk_seed_bytes = 24;
+param int MAYO_2_pk_seed_bytes = 16;
+param int MAYO_2_O_bytes = 540;
+param int MAYO_2_S_bytes = MAYO_2_pk_seed_bytes + MAYO_2_O_bytes;
+
+param int MAYO_2_CRYPTO_SECRETKEYBYTES  = 24;
+param int MAYO_2_CRYPTO_PUBLICKEYBYTES = 5488; 
+
+param int MAYO_2_P1_bytes = 58560;
+param int  MAYO_2_P2_bytes = 34560;
+param int  MAYO_2_P3_bytes = 5472;
+//param int  MAYO_2_P3_bytes = 5184;
+
+param int  param_m_bytes = 32;
+param int  param_v_bytes = 30;
+param int  param_r_bytes = 36;
+
+param int param_salt_bytes = 24;
+param int param_digest_bytes = 32;
+param int MAYO_2_buf_size = MAYO_2_sk_seed_bytes+param_salt_bytes+param_digest_bytes+1;
+
+param int N_MAX = 78;
+param int O_MAX = 18;
+param int N_MINUS_O_MAX = N_MAX - O_MAX;
+
+param int paramn = 78;
+param int paramv = 60;
+param int paramo = 18;
+param int paramm = 64;
+param int paramk = 4;
+
+param int m_legs = paramm/32;
+param int param_A_cols = 73;
+param int F_TAIL_LEN = 5;
+
+param int  param_sig_bytes = 180;

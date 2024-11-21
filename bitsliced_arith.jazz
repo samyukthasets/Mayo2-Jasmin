@@ -1,0 +1,1440 @@
+require "params.jinc"
+require "ffarith.jazz"
+
+
+
+fn encode(reg ptr u8[paramk * paramn] m_p, reg ptr u8[paramk * paramn / 2] menc_p)->reg ptr u8[paramk * paramn / 2]{
+
+   reg u64 i itm itm2;
+   stack u64 two;
+   two = 2;
+   inline int mlen; 
+   reg u8 tmp tmp1;
+
+   mlen = paramk * paramn;
+   i = 0;
+   while(i < mlen){
+    itm = i;
+    itm += 1;
+    if(itm < mlen){
+        tmp = m_p[i];
+        tmp1 = m_p[i + 1];
+        tmp1 <<= 4;
+
+        tmp |= tmp1;
+        itm2 = i;
+        itm2 /= two;
+        menc_p[itm2] = tmp;
+        i += 2;
+    }else {
+        itm2 = i;
+        itm2 /= two;
+        tmp = m_p[i];
+        menc_p[itm2] = tmp;
+        i += 1;
+    }
+
+   }
+
+
+   return menc_p;
+
+}
+
+fn mat_add(reg ptr u8[paramn - paramo] a b, reg ptr u8[paramn] c)->reg ptr u8[paramn]{
+
+inline int i ;
+reg u64 ai bi;
+
+
+for i = 0 to (paramn - paramo){
+    ai = (64u)a[i];
+    bi = (64u)b[i];
+    ai = gf16_add(ai, bi);
+    c[i] = ai;
+}
+return c;
+
+}
+
+#[returnaddress="stack"]
+fn bitsliced_64_vec_mul_add(reg ptr u64[4] in, reg u64 a, reg ptr u64[4] acc)->reg ptr u64[4]
+{
+  reg u64 a0 a1 a2 a3 x y z t r u v w w2;
+  v = a;
+  w = a;
+  w2 = a;
+  a0 = a;
+  a0 = a0 & 1;
+  a0 = - a0;
+
+  a1 = v >> 1;
+  a1 &= 1;
+  a1 = - a1;
+
+  a2 = w >> 2;
+  a2 &= 1;
+  a2 = - a2;
+
+  a3 = w2 >> 3;
+  a3 &= 1;
+  a3 = - a3;
+  
+
+  // deg 0 term of a;
+  t = a0;
+  r = in[0];
+  u = acc[0];
+
+  t = t & r;
+  u ^= t;
+  acc[0] = u;
+
+  t = a0;
+  r = in[1];
+  u = acc[1];
+  
+  t = t & r;
+  u ^= t;
+  acc[1] = u;
+
+  t = a0;
+  r = in[2];
+  u =acc[2];
+  
+  t = t & r;
+  u ^= t;
+ acc[2] = u;
+
+  t = a0;
+  r = in[3];
+  u =acc[3];
+  
+  t = t & r;
+  u ^= t;
+ acc[3] = u;
+  
+  // deg 1 term of a;
+
+  t = in[0];
+  r = in[3];
+  t ^= r;
+  x = t;
+
+  t = a1;
+  r = in[3];
+  u = acc[0];
+  
+  t = t & r;
+  u ^= t;
+  acc[0] = u;
+
+  t = a1;
+  u = acc[1];
+  
+  t = t & x;
+  u ^= t;
+  acc[1] = u;
+
+  t = a1;
+  r = in[1];
+  u =acc[2];
+  
+  t = t & r;
+  u ^= t;
+ acc[2] = u;
+
+  t = a1;
+  r = in[2];
+  u =acc[3];
+  
+  t = t & r;
+  u ^= t;
+ acc[3] = u;
+
+  // deg 2 term of a;
+
+  t = in[2];
+  r = in[3];
+  t ^= r;
+  y = t;
+
+  t = a2;
+  r = in[2];
+  u = acc[0];
+  
+  t = t & r;
+  u ^= t;
+  acc[0] = u;
+
+  t = a2;
+  u = acc[1];
+  
+  t = t & y;
+  u ^= t;
+  acc[1] = u;
+
+  t = a2;
+  u =acc[2];
+  
+  t = t & x;
+  u ^= t;
+ acc[2] = u;
+
+  t = a2;
+  r = in[1];
+  u =acc[3];
+  
+  t = t & r;
+  u ^= t;
+ acc[3] = u;
+
+// deg 3 term of a;
+
+  t = in[2];
+  r = in[1];
+  t ^= r;
+  z = t;
+
+  t = a3;
+  r = in[1];
+  u = acc[0];
+  
+  t = t & r;
+  u ^= t;
+  acc[0] = u;
+
+  t = a3;
+  u = acc[1];
+  
+  t = t & z;
+  u ^= t;
+  acc[1] = u;
+
+  t = a3;
+  u =acc[2];
+  
+  t = t & y;
+  u ^= t;
+ acc[2] = u;
+
+  t = a3;
+  u =acc[3];
+  
+  t = t & x;
+  u ^= t;
+ acc[3] = u;
+
+return acc;
+}
+
+
+
+#[returnaddress="stack"]
+fn bitsliced_m_vec_mul_add_2(reg ptr u32[8] in, reg u32 a, reg ptr u32[8] acc)->reg ptr u32[8]
+{
+  reg ptr u32[2] in0 in1 in2 in3;
+
+  in0 = in[0 : 2];
+  in1 = in[2 : 2];
+  in2 = in[4 : 2];
+  in3 = in[6 : 2];
+
+  reg ptr u32[2] acc0 acc1 acc2 acc3;
+
+  acc0 = acc[0 : 2];
+  acc1 = acc[2 : 2];
+  acc2 = acc[4 : 2];
+  acc3 = acc[6 : 2];
+
+  
+  stack u32 a0 a1 a2 a3;
+
+  a0 = a;
+  a0 = a0 & 1;
+  a0 = - a0;
+
+  a1 = a;
+  a1 = a1 >> 1;
+  a1 &= 1;
+  a1 = - a1;
+
+  a2 = a;
+  a2 = a2 >> 2;
+  a2 &= 1;
+  a2 = - a2;
+
+  a3 = a;
+  a3 = a3 >> 3;
+  a3 &= 1;
+  a3 = - a3;
+ 
+
+  inline int i; reg u32 tmp; 
+  for i = 0 to 2{
+    
+    stack u32 x y z;
+    tmp = a0;
+    tmp &= in0[i];
+    acc0[i] ^= tmp;
+
+    tmp = a0;
+    tmp &= in1[i];
+    acc1[i] ^= tmp;
+
+    tmp = a0;
+    tmp &= in2[i];
+    acc2[i] ^= tmp;
+
+    tmp = a0;
+    tmp &= in3[i];
+    acc3[i] ^= tmp;
+    
+    tmp = in0[i];
+    tmp ^= in3[i];
+    x = tmp;
+
+    tmp = a1;
+    tmp &= in3[i];
+    acc0[i] ^= tmp;
+
+    tmp = a1;
+    tmp &= x;
+    acc1[i] ^= tmp;
+
+    tmp = a1;
+    tmp &= in1[i];
+    acc2[i] ^= tmp;
+
+    tmp = a1;
+    tmp &= in2[i];
+    acc3[i] ^= tmp;
+
+    tmp = in3[i];
+    tmp ^= in2[i];
+    y = tmp;
+    
+    tmp = a2;
+    tmp &= in2[i];
+    acc0[i] ^= tmp;
+
+    tmp = a2;
+    tmp &= y;
+    acc1[i] ^= tmp;
+
+    tmp = a2;
+    tmp &= x;
+    acc2[i] ^= tmp;
+
+    tmp = a2;
+    tmp &= in1[i];
+    acc3[i] ^= tmp;
+
+    // deg 3 term of a
+    tmp = in2[i];
+    tmp ^= in1[i];
+    z = tmp;
+
+    tmp = a3;
+    tmp &= in1[i];
+    acc0[i] ^= tmp;
+
+    tmp = a3;
+    tmp &= z;
+    acc1[i] ^= tmp;
+
+    tmp = a3;
+    tmp &= y;
+    acc2[i] ^= tmp;
+
+    tmp = a3;
+    tmp &= x;
+    acc3[i] ^= tmp;
+
+  }
+
+ acc[0 : 2] = acc0;
+ acc[2 : 2] = acc1;
+ acc[4 : 2] = acc2;
+ acc[6 : 2] = acc3; 
+
+return acc;
+}
+
+
+#[returnaddress="stack"]
+fn bitsliced_m_vec_mul_add(reg ptr u32[12] in, reg u32 a, reg ptr u32[12] acc)->reg ptr u32[12]
+{
+  reg ptr u32[3] in0 in1 in2 in3;
+
+  in0 = in[0 : 3];
+  in1 = in[3 : 3];
+  in2 = in[6 : 3];
+  in3 = in[9 : 3];
+
+  reg ptr u32[3] acc0 acc1 acc2 acc3;
+
+  acc0 = acc[0 : 3];
+  acc1 = acc[3 : 3];
+  acc2 = acc[6 : 3];
+  acc3 = acc[9 : 3];
+
+  
+  stack u32 a0 a1 a2 a3;
+
+  a0 = a;
+  a0 = a0 & 1;
+  a0 = - a0;
+
+  a1 = a;
+  a1 = a1 >> 1;
+  a1 &= 1;
+  a1 = - a1;
+
+  a2 = a;
+  a2 = a2 >> 2;
+  a2 &= 1;
+  a2 = - a2;
+
+  a3 = a;
+  a3 = a3 >> 3;
+  a3 &= 1;
+  a3 = - a3;
+ 
+
+  inline int i; reg u32 tmp; 
+  for i = 0 to 3{
+    
+    stack u32 x y z;
+    tmp = a0;
+    tmp &= in0[i];
+    acc0[i] ^= tmp;
+
+    tmp = a0;
+    tmp &= in1[i];
+    acc1[i] ^= tmp;
+
+    tmp = a0;
+    tmp &= in2[i];
+    acc2[i] ^= tmp;
+
+    tmp = a0;
+    tmp &= in3[i];
+    acc3[i] ^= tmp;
+    
+    tmp = in0[i];
+    tmp ^= in3[i];
+    x = tmp;
+
+    tmp = a1;
+    tmp &= in3[i];
+    acc0[i] ^= tmp;
+
+    tmp = a1;
+    tmp &= x;
+    acc1[i] ^= tmp;
+
+    tmp = a1;
+    tmp &= in1[i];
+    acc2[i] ^= tmp;
+
+    tmp = a1;
+    tmp &= in2[i];
+    acc3[i] ^= tmp;
+
+    tmp = in3[i];
+    tmp ^= in2[i];
+    y = tmp;
+    
+    tmp = a2;
+    tmp &= in2[i];
+    acc0[i] ^= tmp;
+
+    tmp = a2;
+    tmp &= y;
+    acc1[i] ^= tmp;
+
+    tmp = a2;
+    tmp &= x;
+    acc2[i] ^= tmp;
+
+    tmp = a2;
+    tmp &= in1[i];
+    acc3[i] ^= tmp;
+
+    // deg 3 term of a
+    tmp = in2[i];
+    tmp ^= in1[i];
+    z = tmp;
+
+    tmp = a3;
+    tmp &= in1[i];
+    acc0[i] ^= tmp;
+
+    tmp = a3;
+    tmp &= z;
+    acc1[i] ^= tmp;
+
+    tmp = a3;
+    tmp &= y;
+    acc2[i] ^= tmp;
+
+    tmp = a3;
+    tmp &= x;
+    acc3[i] ^= tmp;
+
+  }
+
+ acc[0 : 3] = acc0;
+ acc[3 : 3] =  acc1;
+ acc[6 : 3] = acc2;
+ acc[9 : 3] = acc3; 
+
+return acc;
+}
+
+
+#[returnaddress="stack"]
+fn bitsliced_m_vec_mul_add_slice(reg ptr u32[12] in, reg u32 a, reg ptr u32[768] acc, reg u64 xi)->reg ptr u32[768]
+{
+  reg ptr u32[3] in0 in1 in2 in3;
+
+  in0 = in[0 : 3];
+  in1 = in[3 : 3];
+  in2 = in[6 : 3];
+  in3 = in[9 : 3];
+
+  stack u32[3] acc0 acc1 acc2 acc3;
+  reg u32 tmpt;  reg u64 idx;
+  
+  idx = xi;
+
+
+  tmpt = acc[idx];
+  acc0[0] = tmpt;
+  idx += 1;
+  tmpt = acc[idx];
+  acc0[1] = tmpt;
+  idx += 1;
+  tmpt = acc[idx];
+  acc0[2] = tmpt;
+  idx += 1;
+  tmpt = acc[idx];
+  acc1[0] = tmpt;
+  idx += 1;
+  tmpt = acc[idx];
+  acc1[1] = tmpt;
+  idx += 1;
+  tmpt = acc[idx];
+  acc1[2] = tmpt;
+  idx += 1;
+  tmpt = acc[idx];
+  acc2[0] = tmpt;
+  idx += 1;
+  tmpt = acc[idx];
+  acc2[1] = tmpt;
+  idx += 1;
+  tmpt = acc[idx];
+  acc2[2] = tmpt;
+  idx += 1;
+  tmpt = acc[idx];
+  acc3[0] = tmpt;
+  idx += 1;
+  tmpt = acc[idx];
+  acc3[1] = tmpt;
+  idx += 1;
+  tmpt = acc[idx];
+  acc3[2] = tmpt;
+  
+  stack u32 a0 a1 a2 a3;
+
+  a0 = a;
+  a0 = a0 & 1;
+  a0 = - a0;
+
+  a1 = a;
+  a1 = a1 >> 1;
+  a1 &= 1;
+  a1 = - a1;
+
+  a2 = a;
+  a2 = a2 >> 2;
+  a2 &= 1;
+  a2 = - a2;
+
+  a3 = a;
+  a3 = a3 >> 3;
+  a3 &= 1;
+  a3 = - a3;
+ 
+
+  inline int i; reg u32 tmp; 
+  for i = 0 to 3{
+    
+    stack u32 x y z;
+    tmp = a0;
+    tmp &= in0[i];
+    acc0[i] ^= tmp;
+
+    tmp = a0;
+    tmp &= in1[i];
+    acc1[i] ^= tmp;
+
+    tmp = a0;
+    tmp &= in2[i];
+    acc2[i] ^= tmp;
+
+    tmp = a0;
+    tmp &= in3[i];
+    acc3[i] ^= tmp;
+    
+    tmp = in0[i];
+    tmp ^= in3[i];
+    x = tmp;
+
+    tmp = a1;
+    tmp &= in3[i];
+    acc0[i] ^= tmp;
+
+    tmp = a1;
+    tmp &= x;
+    acc1[i] ^= tmp;
+
+    tmp = a1;
+    tmp &= in1[i];
+    acc2[i] ^= tmp;
+
+    tmp = a1;
+    tmp &= in2[i];
+    acc3[i] ^= tmp;
+
+    tmp = in3[i];
+    tmp ^= in2[i];
+    y = tmp;
+    
+    tmp = a2;
+    tmp &= in2[i];
+    acc0[i] ^= tmp;
+
+    tmp = a2;
+    tmp &= y;
+    acc1[i] ^= tmp;
+
+    tmp = a2;
+    tmp &= x;
+    acc2[i] ^= tmp;
+
+    tmp = a2;
+    tmp &= in1[i];
+    acc3[i] ^= tmp;
+
+    // deg 3 term of a
+    tmp = in2[i];
+    tmp ^= in1[i];
+    z = tmp;
+
+    tmp = a3;
+    tmp &= in1[i];
+    acc0[i] ^= tmp;
+
+    tmp = a3;
+    tmp &= z;
+    acc1[i] ^= tmp;
+
+    tmp = a3;
+    tmp &= y;
+    acc2[i] ^= tmp;
+
+    tmp = a3;
+    tmp &= x;
+    acc3[i] ^= tmp;
+
+  }
+
+idx = xi;
+tmpt = acc0[0];
+acc[idx] = tmpt;
+idx += 1;
+tmpt = acc0[1];
+acc[idx] = tmpt;
+idx += 1;
+tmpt = acc0[2];
+acc[idx] = tmpt;
+idx += 1;
+tmpt = acc1[0];
+acc[idx] = tmpt;
+idx += 1;
+tmpt = acc1[1]; 
+acc[idx] = tmpt;
+idx += 1;
+tmpt = acc1[2];
+acc[idx] = tmpt;
+idx += 1;
+tmpt = acc2[0];
+acc[idx] = tmpt;
+idx += 1;
+tmpt = acc2[1];
+acc[idx] = tmpt;
+idx += 1;
+tmpt = acc2[2];
+acc[idx] = tmpt;
+idx += 1;
+tmpt = acc3[0];
+acc[idx] = tmpt;
+idx += 1;
+tmpt = acc3[1];
+acc[idx] = tmpt;
+idx += 1;
+tmpt = acc3[2];
+acc[idx] = tmpt;
+
+
+return acc;
+}
+
+
+
+
+fn bitsliced_64_vec_copy(reg ptr u64[4] in out)-> reg ptr u64[4]
+{
+  reg u64 tmp;
+
+  tmp = in[0];
+  out[0] = tmp;
+
+  tmp = in[1];
+  out[1] = tmp;
+
+  tmp = in[2];
+  out[2] = tmp;
+
+  tmp = in[3];
+  out[3] = tmp;
+
+  return out;
+}
+
+#[returnaddress="stack"]
+fn bitsliced_m_vec_copy_slice(reg ptr u32[14640] in, reg ptr u32[(paramn - paramo) * (paramn - paramo) * paramm / 8] out, reg u64 s_idx d_idx)-> reg ptr u32[(paramn - paramo) * (paramn - paramo) * paramm / 8]
+{
+  reg u32 tmp;
+
+  inline int i;
+  for i = 0 to 8{
+    tmp = in[s_idx];
+    out[d_idx] = tmp;
+
+    s_idx += 1;
+    d_idx += 1;
+  }
+
+  return out;
+}
+
+#[returnaddress="stack"]
+fn bitsliced_m_vec_copy(reg ptr u32[8] in, reg ptr u32[8] out)-> reg ptr u32[8]
+{
+  reg u32 tmp;
+
+  inline int i;
+  for i = 0 to 8{
+    tmp = in[i];
+    out[i] = tmp;
+  }
+
+  return out;
+}
+
+#[returnaddress="stack"]
+fn bitsliced_64_vec_add( reg ptr u64[4] in1 in2)-> reg ptr u64[4]
+ {
+    inline int i;    
+    for i = 0 to 4 {
+    reg u64 t r;
+    t = in1[i];
+    r = in2[i];
+    t ^= r;
+    in2[i] = t;
+  }
+  return in2;
+  
+}
+
+#[returnaddress="stack"]
+fn bitsliced_m_vec_add( reg ptr u32[8] in1 in2)-> reg ptr u32[8]
+ {
+    inline int i;    
+    for i = 0 to 8 {
+    reg u32 t r;
+    t = in1[i];
+    r = in2[i];
+    t ^= r;
+    in2[i] = t;
+  }
+  return in2;
+  
+}
+
+ #[returnaddress="stack"]
+ fn process_k(reg ptr u64[4] bsmat_slice, reg ptr u8[18] mat_slice, reg ptr u64[72] acc_slice)-> reg ptr u64[72]{
+  inline int mat_cols k_start k; 
+  k_start = 0; reg u64 tmp;
+  mat_cols = paramo;
+  for k = 0 to mat_cols{
+        
+        tmp = (64u) mat_slice[k_start + k];
+        () = #spill(bsmat_slice, tmp);
+        acc_slice[u64 4 * k: 4] =  bitsliced_64_vec_mul_add(bsmat_slice, tmp, acc_slice[u64 4 * k: 4]);  
+        () = #spill(bsmat_slice, tmp);
+      }
+ return acc_slice;
+}
+
+ #[returnaddress="stack"]
+ fn process_k_loop(reg ptr u32[144] bsmat_slice_p, reg u8 mat_val, reg ptr u32[144] acc_slice_p, reg u64 k)-> reg ptr u32[144]{
+  inline int bs_mat_cols;
+  bs_mat_cols = paramo;
+  reg u32 tmp;
+  tmp = (32u)mat_val;
+  reg ptr u32[8] acc_more_slice_p;
+  reg ptr u32[8] bsmat_more_slice_p;
+  acc_more_slice_p = acc_slice_p[k : 8];
+  bsmat_more_slice_p = bsmat_slice_p[k : 8];
+  () = #spill(bsmat_more_slice_p, tmp);
+  acc_more_slice_p = bitsliced_m_vec_mul_add_2(bsmat_more_slice_p, tmp, acc_more_slice_p);
+  () = #unspill(bsmat_more_slice_p, tmp);
+  return acc_slice_p;
+}
+
+ #[returnaddress="stack"]
+ fn process_k_trans(reg ptr u64[72] bsmat_slice, reg u8 mat_element, reg ptr u64[72] acc_slice)-> reg ptr u64[72]{
+
+  inline int bs_mat_cols k; 
+  bs_mat_cols = paramo;
+  reg u64 tmp;
+
+  tmp = (64u)mat_element;
+
+  for k = 0 to bs_mat_cols{
+      acc_slice[u64 4 * k: 4] =  bitsliced_64_vec_mul_add(bsmat_slice[u64 4 * k: 4], tmp, acc_slice[u64 4 * k: 4]);  
+      }
+ return acc_slice;
+}
+
+#[returnaddress="stack"]
+fn bitsliced_m_upper_p3(reg ptr u32[5184] in, reg ptr u32[1368] out)->reg ptr u32[1368]{
+  inline int m_vecs_stored r c;
+  m_vecs_stored = 0;
+
+  for r = 0 to paramo{
+    for c = r to paramo{
+
+    out[u64  4 * m_vecs_stored : 4] = bitsliced_64_vec_copy(in[u64 4* (r * paramo + c) : 4],  out[u64 4 * m_vecs_stored : 4] );
+
+    
+    if(r != c)
+    {
+      out[u64 4 * m_vecs_stored : 4] = bitsliced_64_vec_add(in[u64 4* (c * paramo + r) : 4], out[u64 4 * m_vecs_stored : 4]);
+    } 
+     m_vecs_stored = m_vecs_stored + 1;
+      
+    }
+  }
+  return out;
+}
+
+#[returnaddress="stack"]
+fn bitsliced_m_upper(reg ptr u32[paramk * paramk * paramm / 8] in, reg ptr u32[paramk * (paramk + 1) / 2 * paramm / 8] out)->reg ptr u32[paramk * (paramk + 1) / 2 * paramm / 8]{
+  inline int m_vecs_stored r c size;
+  m_vecs_stored = 0;
+  size = paramk;
+
+  for r = 0 to size{
+    for c = r to size{
+
+    out[u64  4 * m_vecs_stored : 4] = bitsliced_64_vec_copy(in[u64 4* (r * size + c) : 4],  out[u64 4 * m_vecs_stored : 4] );
+
+    
+    if(r != c)
+    {
+      out[u64 4 * m_vecs_stored : 4] = bitsliced_64_vec_add(in[u64 4* (c * size + r) : 4], out[u64 4 * m_vecs_stored : 4]);
+    } 
+     m_vecs_stored = m_vecs_stored + 1;
+      
+    }
+  }
+  return out;
+}
+
+
+#[returnaddress="stack"]
+fn unbitslice_m_vec(reg ptr u32[8] in, reg ptr u8[64] out)->reg ptr u8[64]
+{
+
+reg ptr u32[2] in0 in1 in2 in3;
+
+in0 = in[0 : 2];
+in1 = in[2 : 2];
+in2 = in[4 : 2];
+in3 = in[6 : 2];
+
+inline int leg i;
+reg u32 tmp tmp1;
+
+for  leg = 0 to 2 {
+     //mlegs = 3
+   
+    for i = 0 to 32{
+        tmp = in0[leg];
+        tmp = tmp >> i;
+        tmp = tmp & 1;
+
+        tmp1 = in1[leg];
+        tmp1 = tmp1 >> i;
+        tmp1 = tmp1 & 1;
+        tmp1 = tmp1 << 1;
+
+        tmp = tmp ^ tmp1;
+
+        tmp1 = in2[leg];
+        tmp1 = tmp1 >> i;
+        tmp1 = tmp1 & 1;
+        tmp1 = tmp1 << 2;
+        
+        tmp = tmp ^ tmp1;
+
+        tmp1 = in3[leg];
+        tmp1 = tmp1 >> i;
+        tmp1 = tmp1 & 1;
+        tmp1 = tmp1 << 3;
+        
+        tmp = tmp ^ tmp1;
+
+        out[leg * 32 + i] = tmp;
+
+    }
+}
+return out;
+}
+
+
+
+fn P1_times_Vt(reg ptr u32[14640] bitsliced_P1_f, reg ptr u8[paramk * (paramn - paramo)] Vdec_f,reg ptr u32[(paramn - paramo) * paramk * paramm / 8] acc)-> reg ptr u32[(paramn - paramo) * paramk * paramm / 8]{
+
+  inline int bs_mat_entries_used bs_mat_rows bs_mat_cols r cl triangular mat_rows k;
+
+  triangular = 1;
+  bs_mat_entries_used = 0;
+
+  bs_mat_rows =  paramn - paramo;
+  bs_mat_cols =  paramn - paramo;
+  mat_rows = paramk;
+
+    
+  reg ptr u32[8] bs_mat_slice_p;
+  reg ptr u32[8] acc_slice_p; 
+  inline int ru;
+  reg u32 mat_elmt;
+
+  for r = 0 to bs_mat_rows{
+    for cl = triangular * r to bs_mat_cols{
+        
+
+        for k = 0 to mat_rows{
+          
+            bs_mat_slice_p = (bitsliced_P1_f[ 8 * bs_mat_entries_used : 8]);
+            ru = k ;
+            ru *= bs_mat_cols;
+            ru += cl;
+            mat_elmt = (32u)Vdec_f[ru];
+            acc_slice_p = acc[8 * (r * mat_rows + k) : 8];
+
+            acc_slice_p = bitsliced_m_vec_mul_add_2(bs_mat_slice_p, mat_elmt, acc_slice_p);
+
+            acc[8 * (r * mat_rows + k) : 8] = acc_slice_p;
+
+
+        }
+        bs_mat_entries_used += 1;
+    }
+
+  }
+ 
+    return acc;
+}
+
+
+fn mul_add_mat_x_bitsliced_m_mat(reg ptr u8[paramk * (paramn - paramo)] mat, reg ptr u32[(paramn - paramo) * paramk * paramm / 8] bs_mat, reg ptr u32[paramk * paramk * paramm / 8] acc)-> reg ptr u32[paramk * paramk * paramm / 8]{
+
+   reg ptr u32[8] bs_mat_slice_p;
+   reg ptr u32[8] acc_slice_p;
+   reg u8 mat_element;
+
+   inline int rr cc kk;
+
+   inline int mat_rows mat_cols bs_mat_cols;
+   mat_rows = paramk;
+   mat_cols = (paramn - paramo);
+   bs_mat_cols = paramk;
+   reg u32 tmpkl;
+   
+   for rr = 0 to mat_rows{
+    for cc = 0 to mat_cols{
+        
+        mat_element = mat[rr * mat_cols + cc];
+        
+        for kk = 0 to bs_mat_cols{
+
+          bs_mat_slice_p = bs_mat[8 * (cc * bs_mat_cols + kk) : 8];
+
+          acc_slice_p = acc[8 * (rr * bs_mat_cols + kk) : 8];
+            
+          tmpkl = (32u)mat_element;
+        
+          acc_slice_p = bitsliced_m_vec_mul_add_2(bs_mat_slice_p, tmpkl, acc_slice_p);
+
+          acc[8 * (rr * bs_mat_cols + kk) : 8] = acc_slice_p;
+            
+        }    
+    }
+   }
+   return acc;
+}
+inline fn copy_80u8(stack u8[80] src) -> stack u8[80] {
+  stack u8[80] dst;
+  dst = #copy_8(src);
+  return dst;
+}
+
+inline fn copy_32u8(stack u8[32] src) -> stack u8[32] {
+  stack u8[32] dst;
+  dst = #copy_8(src);
+  return dst;
+}
+
+inline fn copy_24u8(stack u8[24] src) -> stack u8[24] {
+  stack u8[24] dst;
+  dst = #copy_8(src);
+  return dst;
+}
+
+
+inline fn copy_540u8(stack u8[540] src) -> stack u8[540] {
+  stack u8[540] dst;
+  dst = #copy_8(src);
+  return dst;
+}
+
+
+inline fn copy_58560u8(stack u8[58560] src) -> stack u8[58560] {
+  stack u8[58560] dst;
+  dst = #copy_8(src);
+  return dst;
+}
+
+
+inline fn copy_34560u8(stack u8[34560] src) -> stack u8[34560] {
+  stack u8[34560] dst;
+  dst = #copy_8(src);
+  return dst;
+}
+
+fn decode_o_tenc(reg ptr u8[32] m, reg ptr u8[64] mdec_p)->reg ptr u8[64]
+{
+     inline int i mdeclen; 
+     reg u8 tmp;
+
+     mdeclen = 64;
+
+     for i = 0 to mdeclen/2{
+          tmp = m[i];
+          tmp = tmp & 0xf;
+
+          mdec_p[i * 2] = tmp;
+
+          tmp = m[i];
+          tmp = tmp >> 4;
+          mdec_p[i * 2 + 1] = tmp;
+     }
+     if ((mdeclen % 2) ==1)
+     {
+          tmp = m[i];
+          tmp = tmp & 0xf;
+          mdec_p[mdeclen - 1] = tmp;
+     }
+     return mdec_p;
+
+}
+
+
+fn decode_sig(reg ptr u8[paramk * paramn / 2] m, reg ptr u8[paramk * paramn] mdec_p)->reg ptr u8[paramk * paramn]
+{
+     inline int i mdeclen; 
+     reg u8 tmp;
+
+     mdeclen = paramk * paramn;
+
+     for i = 0 to mdeclen/2{
+          tmp = m[i];
+          tmp = tmp & 0xf;
+
+          mdec_p[i * 2] = tmp;
+
+          tmp = m[i];
+          tmp = tmp >> 4;
+          mdec_p[i * 2 + 1] = tmp;
+     }
+     if ((mdeclen % 2) ==1)
+     {
+          tmp = m[i];
+          tmp = tmp & 0xf;
+          mdec_p[mdeclen - 1] = tmp;
+     }
+     return mdec_p;
+
+}
+
+fn bitsliced_m_vec_mul_add_x(reg ptr u32[8] in acc)->reg ptr u32[8]{
+  reg ptr u32[2] in0 in1 in2 in3;
+
+  in0 = in[0 : 2];
+  in1 = in[2 : 2];
+  in2 = in[4 : 2];
+  in3 = in[6 : 2];
+
+  reg ptr u32[2] acc0 acc1 acc2 acc3;
+
+  acc0 = acc[0 : 2];
+  acc1 = acc[2 : 2];
+  acc2 = acc[4 : 2];
+  acc3 = acc[6 : 2];
+
+  reg u32 x tm;
+
+  inline int i m_legsv;
+  m_legsv = paramm / 32;
+
+  for i = 0 to m_legsv{
+    x = in0[i];
+    x ^= in3[i];
+
+    tm = in3[i];
+    acc0[i] ^= tm;
+
+    acc1[i] ^= x;
+
+    tm = in1[i];
+    acc2[i] ^= tm;
+
+    tm = in2[i];
+    acc3[i] ^= tm;
+  }
+  
+ acc[0 : 2] = acc0;
+ acc[2 : 2] = acc1;
+ acc[4 : 2] = acc2;
+ acc[6 : 2] = acc3; 
+
+return acc;
+
+}
+
+
+fn bitsliced_m_multiply_bins(reg ptr u32[128] bins_p, reg ptr u32[8] out)->reg ptr u32[8]{
+
+inline int m_legsv;
+m_legsv = paramm / 32;
+
+stack u32[128] bins;
+reg u64 i;
+i = 0;
+reg u32 aux;
+while(i < 128){
+  aux = bins_p[i];
+  bins[i] = aux;
+  i += 1;
+}
+
+bins[12 * m_legsv * 4 : 8] = bitsliced_m_vec_add(bins[15 * m_legsv * 4 : 8], bins[12 * m_legsv * 4 : 8]);
+
+bins[3 * m_legsv * 4 : 8] = bitsliced_m_vec_add(bins[15 * m_legsv * 4 : 8], bins[3 * m_legsv * 4 : 8]);
+
+bins[8 * m_legsv * 4 : 8] = bitsliced_m_vec_add(bins[14 * m_legsv * 4 : 8], bins[8 * m_legsv * 4 : 8]);
+
+
+bins[6 * m_legsv * 4 : 8] = bitsliced_m_vec_add(bins[14 * m_legsv * 4 : 8], bins[6 * m_legsv * 4 : 8]);
+
+bins[10 * m_legsv * 4 : 8] = bitsliced_m_vec_add(bins[13 * m_legsv * 4 : 8], bins[10 * m_legsv * 4 : 8]);
+
+bins[7 * m_legsv * 4 : 8] = bitsliced_m_vec_add(bins[13 * m_legsv * 4 : 8], bins[7 * m_legsv * 4 : 8]);
+
+bins[8 * m_legsv * 4 : 8] = bitsliced_m_vec_add(bins[12 * m_legsv * 4 : 8], bins[8 * m_legsv * 4 : 8]);
+bins[4 * m_legsv * 4 : 8] = bitsliced_m_vec_add(bins[12 * m_legsv * 4 : 8], bins[4 * m_legsv * 4 : 8]);
+
+bins[9 * m_legsv * 4 : 8] = bitsliced_m_vec_add(bins[11 * m_legsv * 4 : 8], bins[9 * m_legsv * 4 : 8]);
+
+bins[2 * m_legsv * 4 : 8] = bitsliced_m_vec_add(bins[11 * m_legsv * 4 : 8], bins[2 * m_legsv * 4 : 8]);
+
+bins[8 * m_legsv * 4 : 8] = bitsliced_m_vec_add(bins[10 * m_legsv * 4 : 8], bins[8 * m_legsv * 4 : 8]);
+
+bins[2 * m_legsv * 4 : 8] = bitsliced_m_vec_add(bins[10 * m_legsv * 4 : 8], bins[2 * m_legsv * 4 : 8]);
+
+bins[8 * m_legsv * 4 : 8] = bitsliced_m_vec_add(bins[9 * m_legsv * 4 : 8], bins[8 * m_legsv * 4 : 8]);
+
+bins[1 * m_legsv * 4 : 8] = bitsliced_m_vec_add(bins[9 * m_legsv * 4 : 8], bins[1 * m_legsv * 4 : 8]);
+
+bins[4 * m_legsv * 4 : 8] = bitsliced_m_vec_add(bins[7 * m_legsv * 4 : 8], bins[4 * m_legsv * 4 : 8]);
+
+bins[3 * m_legsv * 4 : 8] = bitsliced_m_vec_add(bins[7 * m_legsv * 4 : 8], bins[3 * m_legsv * 4 : 8]);
+
+bins[4 * m_legsv * 4 : 8] = bitsliced_m_vec_add(bins[6 * m_legsv * 4 : 8], bins[4 * m_legsv * 4 : 8]);
+
+bins[2 * m_legsv * 4 : 8] = bitsliced_m_vec_add(bins[6 * m_legsv * 4 : 8], bins[2 * m_legsv * 4 : 8]);
+
+bins[4 * m_legsv * 4 : 8] = bitsliced_m_vec_add(bins[5 * m_legsv * 4 : 8], bins[4 * m_legsv * 4 : 8]);
+
+bins[1 * m_legsv * 4 : 8] = bitsliced_m_vec_add(bins[5 * m_legsv * 4 : 8], bins[1 * m_legsv * 4 : 8]);
+
+bins[2 * m_legsv * 4 : 8] = bitsliced_m_vec_add(bins[3 * m_legsv * 4 : 8], bins[2 * m_legsv * 4 : 8]);
+
+bins[1 * m_legsv * 4 : 8] = bitsliced_m_vec_add(bins[3 * m_legsv * 4 : 8], bins[1 * m_legsv * 4 : 8]);
+
+bins[4 * m_legsv * 4 : 8] = bitsliced_m_vec_mul_add_x(bins[8 * m_legsv * 4 : 8], bins[4 * m_legsv * 4 : 8]);
+
+bins[2 * m_legsv * 4 : 8] = bitsliced_m_vec_mul_add_x(bins[4 * m_legsv * 4 : 8], bins[2 * m_legsv * 4 : 8]);
+
+bins[1 * m_legsv * 4 : 8] = bitsliced_m_vec_mul_add_x(bins[2 * m_legsv * 4 : 8], bins[1 * m_legsv * 4 : 8]);
+
+
+
+out = bitsliced_m_vec_copy(bins[1 * m_legsv * 4 : 8], out);
+
+return out;
+
+}
+
+
+#[returnaddress="stack"]
+fn bitsliced_m_vec_add_slice(reg ptr u32[14640] in, reg ptr u32[16 * paramm * paramk * paramn / 8] acc, reg u64 d_idx s_idx)->reg ptr u32[16 * paramm * paramk * paramn / 8]
+{
+  reg u32 tmp;
+
+  inline int i;
+  for i = 0 to 8{
+    tmp = in[s_idx];
+    acc[d_idx] ^= tmp;
+
+    s_idx += 1;
+    d_idx += 1;
+  }
+
+
+return acc;
+}
+
+
+
+#[returnaddress="stack"]
+fn bitsliced_m_vec_add_slice_p2(reg ptr u32[8640] in, reg ptr u32[16 * paramm * paramk * paramn / 8] acc, reg u64 d_idx s_idx)->reg ptr u32[16 * paramm * paramk * paramn / 8]
+{
+  reg u32 tmp;
+
+  inline int i;
+  for i = 0 to 8{
+    tmp = in[s_idx];
+    acc[d_idx] ^= tmp;
+
+    s_idx += 1;
+    d_idx += 1;
+  }
+
+
+return acc;
+}
+
+
+
+#[returnaddress="stack"]
+fn bitsliced_m_vec_add_slice_p3(reg ptr u32[1824] in, reg ptr u32[16 * paramm * paramk * paramn / 8] acc, reg u64 d_idx s_idx)->reg ptr u32[16 * paramm * paramk * paramn / 8]
+{
+  reg u32 tmp;
+
+  inline int i;
+  for i = 0 to 8{
+    tmp = in[s_idx];
+    acc[d_idx] ^= tmp;
+
+    s_idx += 1;
+    d_idx += 1;
+  }
+
+
+return acc;
+}
+
+
+fn bitsliced_m_calculate_PS(reg ptr u32[14640] P1, reg ptr u32[8640] P2, reg ptr u32[1824] P3, reg ptr u8[paramk * paramn] sans, reg ptr u32[paramn * paramk * paramm / 8] PS)->reg ptr u32[paramn * paramk * paramm / 8]{
+
+inline int m_legsv row col1 ;
+
+m_legsv = paramm / 32;
+
+stack u32[16 * paramm * paramk * paramn / 8] accumulator;
+
+reg u64 ivv;
+ivv = 0;
+while(ivv < 16 * paramm * paramk * paramn / 8){
+     accumulator[ivv] = 0;
+     ivv += 1;
+}
+
+
+reg u64 P1_used j1 tmp64 index fidx pidx;
+P1_used = 0;
+
+for row = 0 to paramv{  
+  j1 = row;
+  while(j1 < paramv){
+    for col1 = 0 to paramk{
+      tmp64 = (64u)sans[col1 * paramn + j1];
+      index = (row * paramk + col1) * 16;
+      index += tmp64; 
+
+      fidx = index;
+      fidx *= 8;
+
+      pidx = P1_used;
+      pidx *= 8;
+
+
+      accumulator  = bitsliced_m_vec_add_slice(P1, accumulator, fidx, pidx);
+    }
+    P1_used += 1;
+    j1 += 1;
+  }
+
+  inline int j2 col2;
+
+  for j2 = 0 to paramo{
+  for col2 = 0 to paramk{
+    tmp64 = (64u)sans[col2 * paramn + j2 + paramv];
+    index = (row * paramk + col2) * 16;
+    index += tmp64;
+
+    fidx = index;
+    fidx *= 8;
+
+    pidx = row * paramo + j2;
+    pidx *= 8; 
+
+    accumulator = bitsliced_m_vec_add_slice_p2(P2, accumulator, fidx, pidx);
+
+  }
+}
+
+
+}
+
+
+
+inline int row3 col3;
+reg u64 j3 P3_used;
+P3_used = 0;
+
+for row3 = paramv to paramn{
+  j3 = row3;
+  while(j3 < paramn){
+    for col3 = 0 to paramk{
+      tmp64 = (64u)sans[col3 * paramn + j3];
+      index = (row3 * paramk + col3) * 16;
+      index += tmp64;
+
+      fidx = index;
+      fidx *= 8;
+
+      pidx = P3_used;
+      pidx *= 8;
+
+      accumulator = bitsliced_m_vec_add_slice_p3(P3, accumulator, fidx, pidx);
+
+    }
+    P3_used += 1;
+    j3 += 1;
+  }
+}
+
+
+
+inline int i3;
+
+for i3  = 0 to paramk * paramn{
+  PS[i3 * m_legs * 4 : 8] = bitsliced_m_multiply_bins(accumulator[i3 * 16 * m_legs * 4 : 128], PS[i3 * m_legs * 4 : 8]);
+}
+
+
+return PS;
+}
+
+
+
+fn mul_add_mat_x_bitsliced_m_mat_ver(reg ptr u8[paramk * paramn] mat, reg ptr u32[paramn * paramk * paramm / 8] bs_mat, reg ptr u32[paramk * paramk * paramm / 8] acc)-> reg ptr u32[paramk * paramk * paramm / 8]{
+
+   reg ptr u32[8] bs_mat_slice_p;
+   reg ptr u32[8] acc_slice_p;
+   reg u8 mat_element;
+
+   inline int rr cc kk;
+
+   inline int mat_rows mat_cols bs_mat_cols;
+   mat_rows = paramk;
+   mat_cols = paramn;
+   bs_mat_cols = paramk;
+   reg u32 tmpkl;
+   
+   for rr = 0 to mat_rows{
+    for cc = 0 to mat_cols{
+        
+        mat_element = mat[rr * mat_cols + cc];
+        
+        for kk = 0 to bs_mat_cols{
+
+          bs_mat_slice_p = bs_mat[8 * (cc * bs_mat_cols + kk) : 8];
+
+          acc_slice_p = acc[8 * (rr * bs_mat_cols + kk) : 8];
+            
+          tmpkl = (32u)mat_element;
+        
+          acc_slice_p = bitsliced_m_vec_mul_add_2(bs_mat_slice_p, tmpkl, acc_slice_p);
+
+          acc[8 * (rr * bs_mat_cols + kk) : 8] = acc_slice_p;
+            
+        }    
+    }
+   }
+   return acc;
+}
+
+
+#[returnaddress="stack"]
+fn bitsliced_m_upper_ver(reg ptr u32[paramk * paramk * paramm / 8] in, reg ptr u32[paramk * (paramk + 1) / 2 * paramm / 8] out)->reg ptr u32[paramk * (paramk + 1) / 2 * paramm / 8]{
+  inline int m_vecs_stored r c size;
+  m_vecs_stored = 0;
+  size = paramk;
+
+  for r = 0 to size{
+    for c = r to size{
+
+    out[u64  4 * m_vecs_stored : 4] = bitsliced_64_vec_copy(in[u64 4* (r * size + c) : 4],  out[u64 4 * m_vecs_stored : 4] );
+
+    
+    if(r != c)
+    {
+      out[u64 4 * m_vecs_stored : 4] = bitsliced_64_vec_add(in[u64 4* (c * size + r) : 4], out[u64 4 * m_vecs_stored : 4]);
+    } 
+     m_vecs_stored = m_vecs_stored + 1;
+      
+    }
+  }
+  return out;
+}
+

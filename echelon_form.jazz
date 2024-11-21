@@ -1,0 +1,812 @@
+require "params.jinc"
+require "bitsliced_arith.jazz"
+u32[16] table =  {0, 1, 9, 14, 13, 11, 7, 6, 15, 2, 12, 5, 10, 4, 3, 8}; 
+
+
+
+inline fn bitsliced_m_extract_element(reg ptr u32[12] in, reg u32 index)-> reg u32{
+
+reg ptr u32[3] in0 in1 in2 in3; //u32[legs] = 3
+
+// legs = 3
+in0 = in[0 : 3];
+in1 = in[3 : 3];
+in2 = in[6 : 3];
+in3 = in[9 : 3];
+
+reg u64 leg;
+leg = (64u)index;
+leg = leg >> 5;
+
+reg u32 tmp tmp1 tmpi tmpj shift;
+
+tmpi = index;
+
+tmpi &= 0x7;
+
+tmpi <<= 2;
+
+tmpj = index;
+tmpj &= 0x18;
+tmpj >>= 3;
+tmpi += tmpj;
+
+shift = tmpi;
+
+tmp = in0[leg];
+tmp >>= shift & 31;
+tmp = tmp & 1;
+
+
+tmp1 = in1[leg];
+tmp1 >>= shift & 31;
+tmp1 = tmp1 & 1;
+tmp1 = tmp1 << 1;
+
+tmp = tmp ^ tmp1;
+
+tmp1 = in2[leg];
+tmp1 >>= shift  & 31;
+tmp1 = tmp1 & 1;
+tmp1 = tmp1 << 2;
+
+tmp = tmp ^ tmp1;
+
+tmp1 = in3[leg];
+tmp1 >>= shift  & 31;
+tmp1 = tmp1 & 1;
+tmp1 = tmp1 << 3;
+tmp = tmp ^ tmp1;
+
+return tmp;
+}
+
+
+inline fn bitsliced_m_extract_element_slice(reg ptr u32[768] in, reg u64 x, reg u32 index)-> reg u32{
+
+stack u32[3] in0 in1 in2 in3; //u32[legs] = 3
+
+// legs = 3
+reg u32 tmpt;  reg u64 idx;
+  
+idx = x;
+
+
+/////////////////////copy the elements
+ 
+tmpt = in[idx];
+in0[0] = tmpt;
+idx += 1;
+tmpt = in[idx];
+in0[1] = tmpt;
+idx += 1;
+tmpt = in[idx];
+in0[2] = tmpt;
+idx += 1;
+tmpt = in[idx];
+in1[0] = tmpt;
+idx += 1;
+tmpt = in[idx];
+in1[1] = tmpt;
+idx += 1;
+tmpt = in[idx];
+in1[2] = tmpt;
+idx += 1;
+tmpt = in[idx];
+in2[0] = tmpt;
+idx += 1;
+tmpt = in[idx];
+in2[1] = tmpt;
+idx += 1;
+tmpt = in[idx];
+in2[2] = tmpt;
+idx += 1;
+tmpt = in[idx];
+in3[0] = tmpt;
+idx += 1;
+tmpt = in[idx];
+in3[1] = tmpt;
+idx += 1;
+tmpt = in[idx];
+in3[2] = tmpt;
+
+/////////////////// done copying
+
+reg u64 leg;
+leg = (64u)index;
+leg = leg >> 5;
+
+reg u32 tmpi;
+tmpi = index;
+
+tmpi &= 0x7;
+
+tmpi <<= 2;
+
+reg u32 tmpj;
+tmpj = index;
+tmpj &= 0x18;
+tmpj >>= 3;
+
+reg u32 shift;
+shift = tmpi;
+shift += tmpj;
+
+reg u32 tmp;
+tmp = in0[leg];
+
+
+tmp >>= shift & 31;
+
+tmp = tmp & 1;
+
+
+
+reg u32 tmp1;
+tmp1 = in1[leg];
+tmp1 >>= (shift & 31);
+tmp1 = tmp1 & 1;
+tmp1 = tmp1 << 1; 
+
+tmp = tmp ^ tmp1;
+
+
+tmp1 = in2[leg];
+tmp1 >>= (shift  & 31);
+tmp1 = tmp1 & 1;
+tmp1 = tmp1 << 2;
+
+tmp = tmp ^ tmp1;
+
+tmp1 = in3[leg];
+tmp1 >>= (shift  & 31);
+tmp1 = tmp1 & 1;
+tmp1 = tmp1 << 3;
+
+tmp = tmp ^ tmp1;
+
+return tmp;
+
+
+
+}
+
+
+inline fn inverses_f(reg u32 a)->reg u32{
+    reg ptr u32[16] table_r;
+    table_r = table;
+    reg u64 a_index;
+    a_index = (64u)a;
+    a_index &= 15;
+    reg u32 ans;
+    ans = table_r[a_index];
+    return ans;
+}
+
+
+
+
+inline fn ef_bitslice_m_vec(reg ptr u8[96] in, reg ptr u32[12] out)->reg ptr u32[12]{
+
+
+reg ptr u32[3] out0 out1 out2 out3; //u32[legs] = 3
+
+// legs = 3
+out0 = out[0 : 3];
+out1 = out[3 : 3];
+out2 = out[6 : 3];
+out3 = out[9 : 3];
+
+stack u32[4] in32;
+
+inline int leg i;
+reg u32 tmp tmp1;
+
+for leg = 0 to 3{
+    for i = 0 to 4{
+         tmp = (32u)in[32*leg + i*8 + 0];
+         tmp = tmp <<  0;
+
+         tmp1 = (32u)in[32*leg + i*8 + 1];
+         tmp1 = tmp1 <<  4;
+
+         tmp = tmp ^ tmp1;
+         
+         tmp1 = (32u)in[32*leg + i*8 + 2];
+         tmp1 = tmp1 <<  8;
+
+         tmp = tmp ^ tmp1;
+
+         tmp1 = (32u)in[32*leg + i*8 + 3];
+         tmp1 = tmp1 <<  12;
+
+         tmp = tmp ^ tmp1;
+
+         tmp1 = (32u)in[32*leg + i*8 + 4];
+         tmp1 = tmp1 <<  16;
+
+         tmp = tmp ^ tmp1;
+
+         tmp1 = (32u)in[32*leg + i*8 + 5];
+         tmp1 = tmp1 <<  20;
+
+         tmp = tmp ^ tmp1;
+
+         tmp1 = (32u)in[32*leg + i*8 + 6];
+         tmp1 = tmp1 <<  24;
+
+         tmp = tmp ^ tmp1;
+
+         tmp1 = (32u)in[32*leg + i*8 + 7];
+         tmp1 = tmp1 <<  28;
+
+         tmp = tmp ^ tmp1;
+         in32[i] =  tmp;
+    }
+    
+    tmp1  = in32[0];
+    tmp1 = tmp1 & 0x11111111;
+    tmp1 = tmp1  >> 0;
+
+    tmp = in32[1];
+    tmp = tmp & 0x11111111;
+    tmp = tmp << 1;
+    
+    tmp = tmp ^ tmp1;
+
+    tmp1 = in32[2];
+    tmp1 = tmp1 & 0x11111111;
+    tmp1 = tmp1 << 2;
+
+    tmp = tmp ^ tmp1;
+
+    tmp1 = in32[3];
+    tmp1 = tmp1 & 0x11111111;
+    tmp1 = tmp1 << 3;
+
+    tmp = tmp ^ tmp1;
+
+    out0[leg] =   tmp;
+
+    tmp1  = in32[0];
+    tmp1 = tmp1 & 0x22222222;
+    tmp1 = tmp1  >> 1;
+
+    tmp = in32[1];
+    tmp = tmp & 0x22222222;
+    tmp = tmp >> 0;
+    
+    tmp = tmp ^ tmp1;
+
+    tmp1 = in32[2];
+    tmp1 = tmp1 & 0x22222222;
+    tmp1 = tmp1 << 1;
+
+    tmp = tmp ^ tmp1;
+
+    tmp1 = in32[3];
+    tmp1 = tmp1 & 0x22222222;
+    tmp1 = tmp1 << 2;
+
+    tmp = tmp ^ tmp1;
+
+    out1[leg] = tmp;
+
+    tmp1  = in32[0];
+    tmp1 = tmp1 & 0x44444444;
+    tmp1 = tmp1  >> 2;
+
+    tmp = in32[1];
+    tmp = tmp & 0x44444444;
+    tmp = tmp >> 1;
+    
+    tmp = tmp ^ tmp1;
+
+    tmp1 = in32[2];
+    tmp1 = tmp1 & 0x44444444;
+    tmp1 = tmp1 >> 0;
+
+    tmp = tmp ^ tmp1;
+
+    tmp1 = in32[3];
+    tmp1 = tmp1 & 0x44444444;
+    tmp1 = tmp1 << 1;
+
+    tmp = tmp ^ tmp1;
+
+    out2[leg] =   tmp;
+
+    
+    tmp1  = in32[0];
+    tmp1 = tmp1 & 0x88888888;
+    tmp1 = tmp1  >> 3;
+
+    tmp = in32[1];
+    tmp = tmp & 0x88888888;
+    tmp = tmp >> 2;
+    
+    tmp = tmp ^ tmp1;
+
+    tmp1 = in32[2];
+    tmp1 = tmp1 & 0x88888888;
+    tmp1 = tmp1 >> 1;
+
+    tmp = tmp ^ tmp1;
+
+    tmp1 = in32[3];
+    tmp1 = tmp1 & 0x88888888;
+    tmp1 = tmp1 >> 0;
+
+    tmp = tmp ^ tmp1;
+
+    out3[leg] =   tmp;
+   }
+    
+    out[0 : 3] = out0 ;
+    out[3 : 3] = out1 ;
+    out[6 : 3] = out2 ;
+    out[9 : 3] = out3 ;
+
+    return out;
+}
+
+inline fn ef_unbitslice_m_vec(reg ptr u32[12] in, reg ptr u8[96] out)->reg ptr u8[96]
+{
+
+reg ptr u32[3] in0 in1 in2 in3;
+
+in0 = in[0 : 3];
+in1 = in[3 : 3];
+in2 = in[6 : 3];
+in3 = in[9 : 3];
+
+
+stack u32[4] out32;
+inline int leg i;
+reg u32 tmp tmp1;
+
+for  leg = 0 to 3 {
+     //mlegs = 3
+   
+
+    tmp = in0[leg];
+    tmp = tmp & 0x11111111;
+    tmp = tmp >> 0;
+
+    tmp1 = in1[leg];
+    tmp1 = tmp1 & 0x11111111;
+    tmp1 = tmp1 << 1;
+
+    tmp = tmp ^ tmp1;
+
+    tmp1 = in2[leg];
+    tmp1 = tmp1 & 0x11111111;
+    tmp1 = tmp1 << 2;
+
+    tmp = tmp ^ tmp1;
+
+    tmp1 = in3[leg];
+    tmp1 = tmp1 & 0x11111111;
+    tmp1 = tmp1 << 3;
+
+    tmp = tmp ^ tmp1;
+    out32[0] = tmp;
+
+    tmp = in0[leg];
+    tmp = tmp & 0x22222222;
+    tmp = tmp >> 1;
+
+    tmp1 = in1[leg];
+    tmp1 = tmp1 & 0x22222222;
+    tmp1 = tmp1 >> 0;
+
+    tmp = tmp ^ tmp1;
+
+    tmp1 = in2[leg];
+    tmp1 = tmp1 & 0x22222222;
+    tmp1 = tmp1 << 1;
+
+    tmp = tmp ^ tmp1;
+
+    tmp1 = in3[leg];
+    tmp1 = tmp1 & 0x22222222;
+    tmp1 = tmp1 << 2;
+
+    tmp = tmp ^ tmp1;
+    out32[1] = tmp;
+
+    tmp = in0[leg];
+    tmp = tmp & 0x44444444;
+    tmp = tmp >> 2;
+
+    tmp1 = in1[leg];
+    tmp1 = tmp1 & 0x44444444;
+    tmp1 = tmp1 >> 1;
+
+    tmp = tmp ^ tmp1;
+
+    tmp1 = in2[leg];
+    tmp1 = tmp1 & 0x44444444;
+    tmp1 = tmp1 >> 0;
+
+    tmp = tmp ^ tmp1;
+
+    tmp1 = in3[leg];
+    tmp1 = tmp1 & 0x44444444;
+    tmp1 = tmp1 << 1;
+
+    tmp = tmp ^ tmp1;
+    out32[2] = tmp;
+
+    tmp = in0[leg];
+    tmp = tmp & 0x88888888;
+    tmp = tmp >> 3;
+
+    tmp1 = in1[leg];
+    tmp1 = tmp1 & 0x88888888;
+    tmp1 = tmp1 >> 2;
+
+    tmp = tmp ^ tmp1;
+
+    tmp1 = in2[leg];
+    tmp1 = tmp1 & 0x88888888;
+    tmp1 = tmp1 >> 1;
+
+    tmp = tmp ^ tmp1;
+
+    tmp1 = in3[leg];
+    tmp1 = tmp1 & 0x88888888;
+    tmp1 = tmp1 >> 0;
+
+    tmp = tmp ^ tmp1;
+    out32[3] = tmp;
+
+
+for i = 0 to 8{
+    tmp = out32[0];
+    tmp = tmp >> (i*4);
+    tmp = tmp & 0xF;
+    out[32*leg + 0*8 + i] = tmp ;
+
+    tmp = out32[1];
+    tmp = tmp >> (i*4);
+    tmp = tmp & 0xF;
+    out[32*leg + 1*8 + i] = tmp ;
+
+    tmp = out32[2];
+    tmp = tmp >> (i*4);
+    tmp = tmp & 0xF;
+    out[32*leg + 2*8 + i] = tmp ;
+
+    tmp = out32[3];
+    tmp = tmp >> (i*4);
+    tmp = tmp & 0xF;
+    out[32*leg + 3*8 + i] = tmp ;
+
+}
+}
+return out;
+}
+
+
+inline fn is_greater_than(reg u32 a b)-> reg u32{
+    reg u32 tmp;
+    if (a > b){
+        tmp = 0xFFFFFFFF;
+    }
+    else{
+        tmp = 0x00;
+    }
+
+    return tmp;
+}
+
+inline fn ct_compare_32(reg u32 a b)-> reg u32{
+    reg u32 tmp;
+
+    tmp = a;
+    tmp = tmp ^ b;
+    tmp -= 1 ;
+    tmp = tmp >> 31;
+    tmp &= 1;
+    tmp = -tmp;
+    
+    return tmp;
+}
+
+
+fn ef(reg ptr u8[2 * paramm * (paramk * paramo + 1)] A_s, reg ptr u8[paramm * (paramk * paramo + 1)] Aef_p)->reg ptr u8[paramm * (paramk * paramo + 1)] 
+{   
+    inline int NROWS NCOLS legs;
+    NROWS = paramm;
+    NCOLS = paramk * paramo + 1;
+    legs = (NCOLS + 31) / 32;
+ 
+    /////////////bitslice A
+    //reg ptr u32[768] bitsliced_A; // NROWS * legs * 4 = 768
+    stack u32[768] bitsliced_A_s;
+  
+    //legs  = 3
+    inline int ir;
+    
+    for ir = 0 to paramm
+    {
+       bitsliced_A_s[ir * 12 :12] = ef_bitslice_m_vec(A_s[ir * 73 : 96], bitsliced_A_s[ir * 12 :12] );
+    }
+
+
+    /////////////
+    reg u64 pivot_col;
+    pivot_col = 0;
+
+    reg u32 inverse; stack u32 pivot_row; pivot_row = 0;
+    
+    while(pivot_col < NCOLS)
+    {  
+        stack u64 tmp1; stack u32 pivot_col32;
+        reg u64 pivot_row_lower_bound;
+        
+        pivot_col32 = pivot_col ;
+       
+        tmp1 = pivot_col;
+        tmp1 += 64; //NROWS
+        tmp1 -= 73; //NCOLS
+
+        if(tmp1 > 0 )
+            {   
+                   if(tmp1 < 64){ //NROWS
+                    
+                    pivot_row_lower_bound = tmp1 ;
+                   }
+                    else{
+                         
+                        pivot_row_lower_bound = 0;
+                    }                
+            }
+        else{
+                pivot_row_lower_bound = 0;
+            }
+
+               
+        tmp1 = 64;//NROWS
+        tmp1 -= 1;
+       
+        stack u64 pivot_row_upper_bound;
+
+        if(tmp1 < pivot_col){
+            pivot_row_upper_bound = tmp1;
+        }
+        else{
+            pivot_row_upper_bound = pivot_col;
+        }
+        
+
+        reg u64 tmp2; stack u64 range;
+        tmp2 = pivot_row_upper_bound;
+        tmp2 += 32;
+
+        if(tmp1 < tmp2){
+            range = tmp1;
+        }
+        else{
+            range = tmp2;
+        }
+    
+        tmp2 = range;
+        
+
+        stack u32[12] _pivot_row _pivot_row2;
+        reg ptr u32[12] _pivot_row_r;
+        _pivot_row_r = _pivot_row;
+
+        reg u32 pivot; 
+        stack u32 pivot_is_zero;
+
+        pivot = 0;
+        
+        pivot_is_zero = -1;
+
+        
+        inline int kl;
+        for kl = 0 to 12{
+            _pivot_row[kl] = 0;
+            _pivot_row2[kl] = 0;
+            
+        }
+         
+    
+        reg u64 row;
+        row = pivot_row_lower_bound;
+        while(row <= tmp2){
+    
+            stack u32 is_pivot_row;
+            stack u32 row32;
+            row32 = row;
+
+            is_pivot_row = ct_compare_32(row32, pivot_row);
+                      
+
+            stack u32 below_pivot_row;
+            below_pivot_row = is_greater_than(row32, pivot_row);
+
+            
+            inline int j;
+            
+       
+            for j = 0 to 12{
+                    reg u32 tmp3 tmp4;
+                    reg u64 index;
+                    index = row;
+                    index *= 12;
+                    index += j;
+
+                    tmp3 = bitsliced_A_s[index];
+                    tmp4 = below_pivot_row;
+                    tmp4 &= pivot_is_zero;
+                    tmp4 |= is_pivot_row;
+                                        
+                    tmp4 &= tmp3;
+
+                    tmp3 = _pivot_row[j];
+                    tmp4 ^= tmp3; 
+                   _pivot_row[j] = tmp4;                   
+
+            }
+            
+         
+            pivot = bitsliced_m_extract_element(_pivot_row, pivot_col32);
+            stack u32 zero;
+            zero = 0;
+            pivot_is_zero = ct_compare_32(pivot, zero);
+ 
+        row += 1;           
+        }
+               
+    
+       inverse = inverses_f(pivot);       
+       _pivot_row2 = bitsliced_m_vec_mul_add(_pivot_row, inverse, _pivot_row2);
+
+       
+                reg u64 rowi;
+                rowi = pivot_row_lower_bound;
+
+                while(rowi <= pivot_row_upper_bound)
+                {
+                    stack u32 do_copy;
+                    stack u32 pivot_not_zero rowi32;
+
+                    rowi32 = rowi;
+                    do_copy = ct_compare_32(rowi32, pivot_row);
+                    
+                    pivot_not_zero = pivot_is_zero;
+                    pivot_not_zero = !pivot_not_zero;
+
+                    do_copy = ct_compare_32(rowi32, pivot_row);
+                    reg u32 do_copy_r;
+                    do_copy_r = do_copy;
+
+                    do_copy_r &= pivot_not_zero;
+
+                    
+                    stack u32 do_not_copy;
+
+                    do_not_copy = do_copy_r;
+                    do_not_copy = !do_not_copy;
+                   
+                    inline int col;
+                    for col = 0 to 12{
+                        reg u64 index col_r;
+                        col_r = col;
+                        index = rowi;
+                        index *= 12;
+                        index += col_r;
+
+                        reg u32 tmpi tmpj;
+                            
+                        tmpi = do_not_copy;
+                        tmpi &= bitsliced_A_s[index];
+
+                        tmpj = do_copy_r;
+                        tmpj &= _pivot_row2[col];
+
+                        tmpi += tmpj;
+                        bitsliced_A_s[index] = tmpi;                        
+                    }           
+                 rowi += 1; 
+                }
+
+
+            reg u64 rowj; 
+            rowj = pivot_row_lower_bound;
+            
+            while(rowj < NROWS){
+               reg u32 below_pivot pivot_not_zero_n;
+
+                if (pivot_is_zero == 0x00) {
+                            pivot_not_zero_n = 0x01;
+                }else {
+                            pivot_not_zero_n = 0x00;
+                }
+                    
+                            
+                if(rowj > pivot_row){     
+                    if(pivot_not_zero_n == 0x01) {
+                            below_pivot = 0x01;
+                        }
+                    else {
+                            below_pivot = 0x00;
+                        }                  
+                }
+                else {
+                            below_pivot = 0x00;
+                }
+                    
+                
+
+                reg u32 elt_to_elim;
+                reg u64 x_val;
+                
+                x_val = rowj;
+                x_val *= 12;
+                    
+                elt_to_elim = bitsliced_m_extract_element_slice(bitsliced_A_s, x_val, pivot_col32);
+                
+                reg u64 idxj;
+
+                idxj = rowj;
+                idxj *= 12;
+
+                reg u32 bpelt;
+
+                bpelt = below_pivot;
+                bpelt *= elt_to_elim;
+
+                reg u64 xval;
+                xval = rowj;
+                xval *= 12;
+
+                () = #spill(bpelt, xval);
+                bitsliced_A_s = bitsliced_m_vec_mul_add_slice(_pivot_row2, bpelt, bitsliced_A_s, xval);
+                () = #unspill(bpelt, xval);
+                
+      
+                rowj += 1;
+                }
+                reg u32 pivot_row_r;
+                if(pivot_is_zero == 0x00){
+                    
+                    pivot_row_r = pivot_row;
+                    pivot_row_r += 1;
+                    pivot_row = pivot_row_r;
+                }   
+                        
+            
+ 
+    pivot_col += 1;
+    }
+
+
+      
+       reg u64 jndc; reg u8 auc;
+        inline int ivr jvr; stack u8[96] temp;
+        for ivr = 0 to 64
+        {   
+            
+            temp = ef_unbitslice_m_vec(bitsliced_A_s[ivr * 12 : 12], temp);
+        
+
+            for jvr = 0 to 73{
+                jndc = ivr;
+                jndc *= 73;
+                jndc += jvr;
+
+                auc = temp[jvr];
+                Aef_p[jndc] = auc;
+            }
+        }
+        
+
+
+return Aef_p;
+
+}

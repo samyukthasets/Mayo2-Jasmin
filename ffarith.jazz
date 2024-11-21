@@ -1,0 +1,144 @@
+
+u64[16] tabler = {0, 1, 9, 14, 13, 11, 7, 6, 15, 2, 12, 5, 10, 4, 3, 8};
+inline fn gf16_add(reg u64 in1, reg u64 in2)-> reg u64{
+    in1^=in2;
+    in1 = in1;
+    return in1;
+}
+
+inline fn gf16_sub(reg u64 in1, reg u64 in2)-> reg u64{
+    in1^=in2;
+    in1 = in1;
+    return in1;
+}
+
+inline fn gf16_neg(reg u64 in)-> reg u64{
+    in = in;
+    return in;
+}
+
+inline fn gf16_mul(reg u64 in1, reg u64 in2)-> reg u64{
+   reg u64 p1 p2; 
+
+   p1  = in1;
+   p1  &= 1;
+   p1 *= in2;
+
+   p2  = in1;
+   p2  &= 2;
+   p2 *= in2;
+
+   p1 ^= p2;
+
+   p2  = in1;
+   p2  &= 4;
+   p2 *= in2;
+
+   p1 ^= p2;
+
+   p2  = in1;
+   p2  &= 8;
+   p2 *= in2;
+
+   p1 ^= p2;
+
+   stack u64 p;
+
+   p = p1;
+   
+
+   stack u64 top_p;
+   top_p = p;
+   top_p &= 0xf0;  
+
+
+   stack u64 tps4 tps3;
+
+   tps3 = top_p;
+   tps3 >>= 3;
+
+   tps4 = top_p;
+   tps4 >>= 4;
+
+   reg u64 out;
+
+   out = p;
+   out ^= tps4;
+   out ^= tps3;
+   out &= 0x0f;
+  
+
+   return out;
+
+}
+
+
+inline fn gf16_mul_fx8(reg u64 in1, reg u64 in2)-> reg u64{
+   reg u64 p1 p2; 
+
+   p1  = in1;
+   p1  &= 1;
+   p1 *= in2;
+
+   p2  = in1;
+   p2  &= 2;
+   p2 *= in2;
+
+   p1 ^= p2;
+
+   p2  = in1;
+   p2  &= 4;
+   p2 *= in2;
+
+   p1 ^= p2;
+
+   p2  = in1;
+   p2  &= 8;
+   p2 *= in2;
+
+   p1 ^= p2;
+
+   stack u64 p;
+
+   p = p1;
+   
+
+   stack u64 top_p;
+   top_p = p;
+   top_p &= 0xf0f0f0f0f0f0f0f0;  
+
+
+   stack u64 tps4 tps3;
+
+   tps3 = top_p;
+   tps3 >>= 3;
+
+   tps4 = top_p;
+   tps4 >>= 4;
+
+   reg u64 out;
+
+   out = p;
+   out ^= tps4;
+   out ^= tps3;
+   out &= 0x0f0f0f0f0f0f0f0f;
+  
+
+   return out;
+
+
+}
+
+
+
+inline fn gf16_inv(reg u64 in)-> reg u64{
+    reg ptr u64[16] gtable; 
+    reg u64 b c;
+    
+
+    gtable = tabler;
+    c = in & 15;
+    b = gtable[(int)(c)];
+    
+    return b;
+}

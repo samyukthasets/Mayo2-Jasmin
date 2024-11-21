@@ -1,0 +1,413 @@
+require "params.jinc"
+require "expand_sk.jazz"
+require "shake256_lib.jazz"
+//require "values_expand_sk.jazz"
+require "echelon_form.jazz"
+require "ffarith.jazz"
+
+export fn mayo2_crypto_sign(reg u64 signed_message
+          message
+          message_length
+          secret_key
+) -> reg u64
+{
+    
+    secret_key = secret_key;
+    message_length = message_length;
+    
+    stack u8[param_digest_bytes] tmp;
+    () = #spill(message, message_length, signed_message);
+    tmp = __shake256_32_x(tmp, message, message_length);
+        
+    stack u64[MAYO_2_sk_seed_bytes / 8] secret_key_64;
+
+    inline int is;
+    for is = 0 to 3{
+        secret_key_64[is] = [secret_key + is * 8];
+    }
+
+    stack u8[MAYO_2_sk_seed_bytes] csk_8;    
+    csk_8 = #copy_64(secret_key_64);   
+
+   
+  stack u8[MAYO_2_sk_seed_bytes + MAYO_2_O_bytes + MAYO_2_P1_bytes + MAYO_2_P2_bytes] sk_8;      
+  sk_8 = mayo_expand_sk(csk_8, sk_8);
+  
+
+    stack u32[(MAYO_2_sk_seed_bytes + MAYO_2_O_bytes + MAYO_2_P1_bytes + MAYO_2_P2_bytes)/4] sk_32;
+    sk_32 = #copy_8(sk_8);
+    
+    stack u8[(paramn - paramo) * paramo] mdec;
+      
+    mdec = decode_o_sign(sk_8[MAYO_2_sk_seed_bytes: MAYO_2_O_bytes], mdec);
+    
+
+   
+
+    stack u32[MAYO_2_P1_bytes/4] bitsliced_P1_s;
+     reg u64 ik;
+    ik = (MAYO_2_sk_seed_bytes + MAYO_2_O_bytes)/4; reg u32 tmp1;
+    while(ik < (MAYO_2_sk_seed_bytes + MAYO_2_O_bytes + MAYO_2_P1_bytes+MAYO_2_P2_bytes)/4){
+        tmp1 = sk_32[ik];
+        bitsliced_P1_s[ik - ((MAYO_2_sk_seed_bytes + MAYO_2_O_bytes)/4)] = tmp1;
+        ik += 1;
+    }
+    
+    reg u64 ik1;
+    stack u32[MAYO_2_P2_bytes/4] bitsliced_Ll_s;
+    ik1 = (MAYO_2_sk_seed_bytes + MAYO_2_O_bytes + MAYO_2_P1_bytes)/4; 
+    while(ik1 < (MAYO_2_sk_seed_bytes + MAYO_2_O_bytes + MAYO_2_P1_bytes+MAYO_2_P2_bytes)/4){
+        tmp1 = sk_32[ik1];
+        bitsliced_Ll_s[ik1 - ((MAYO_2_sk_seed_bytes + MAYO_2_O_bytes + MAYO_2_P1_bytes)/4)] = tmp1;
+        ik1 += 1;
+    }
+    
+
+    stack u8[param_digest_bytes + param_salt_bytes + MAYO_2_sk_seed_bytes] tmp_with_salt;
+
+    tmp_with_salt[0:param_digest_bytes] = copy_32u8(tmp);  
+
+
+
+///////////////TODO : Salt////////////
+
+    stack u8[param_salt_bytes] salt_s;
+
+ salt_s = #randombytes(salt_s);  
+     
+       tmp_with_salt[param_digest_bytes:param_salt_bytes] = copy_24u8(salt_s);
+
+
+
+       tmp_with_salt[param_digest_bytes + param_salt_bytes:MAYO_2_sk_seed_bytes] = copy_24u8(csk_8);
+
+    
+
+        
+        salt_s = __shake256_24_80(salt_s, tmp_with_salt);
+        
+
+        tmp_with_salt[param_digest_bytes:param_salt_bytes] = copy_24u8(salt_s);
+
+        stack u8[param_m_bytes] tenc;
+        tenc = __shake256_32_56(tenc, tmp_with_salt[0:param_digest_bytes + param_salt_bytes]);
+
+        stack u8[paramm] t_mat;
+        t_mat = decode_o_tenc(tenc, t_mat);
+       
+ 
+
+
+  
+stack u8[param_digest_bytes + param_salt_bytes + MAYO_2_sk_seed_bytes +1] tmp_with_salt_1;
+
+
+
+tmp_with_salt_1[0: param_digest_bytes + param_salt_bytes + MAYO_2_sk_seed_bytes] = copy_80u8(tmp_with_salt);
+tmp_with_salt_1[80] = 0x00;
+stack u8[paramk * param_v_bytes + param_r_bytes] total_v_bytes;
+stack u8[paramk * (paramn - paramo)] Vdec;
+stack u32[paramk * paramo * paramm / 8] bitsliced_M;
+stack u8[2 * paramm * (paramk * paramo + 1)] Amatrix;
+stack u8[2 * paramm] yvector; 
+stack u8[paramm * paramo * paramk] M;
+stack u8[paramm * paramo] Mi;
+reg ptr u8[paramm * paramo] Mj;
+
+stack u8[paramk * paramo + 1] r_start;
+stack u8[paramk * paramn] x;
+inline int xc;
+for xc = 0 to paramk * paramn{
+    x[xc] = 0;
+}
+ 
+stack u8 done;
+stack u16 ctr;
+ctr = 1 ;done = 0;
+reg bool tmpbool;
+reg bool zf;
+reg u8 tmpboolu8;
+
+
+while{
+    tmpbool = ctr > 1;
+	tmpboolu8 = #SETcc(tmpbool);    
+	tmpboolu8 |= done;
+    _, _, _, _, zf = #TEST_8(tmpboolu8, tmpboolu8);
+}(zf) {
+    ctr += 1;
+   
+    total_v_bytes = __shake256_156_81(total_v_bytes, tmp_with_salt_1);
+    
+    done = 1;
+    
+    
+    inline int ivd;
+    ivd = 0;
+
+    for ivd = 0 to paramk{
+            Vdec[ivd * (paramn - paramo)  :  (paramn - paramo)] = decode_o_vdec(total_v_bytes[ivd * param_v_bytes: param_v_bytes], Vdec[ivd * (paramn - paramo)  :  (paramn - paramo)]);
+    }
+   
+
+
+     ///mul_add_mat_x_bitsliced_m_mat
+     reg ptr u32[144] bs_mat_slice_p;
+   reg ptr u32[144] acc_slice_p;
+   reg u8 mat_element;
+
+   inline int rr cc kk;
+
+   inline int mat_rows mat_cols bs_mat_cols;
+   mat_rows = paramk;
+   mat_cols = (paramn - paramo);
+   bs_mat_cols = paramo;
+   reg u32 tmpkl;
+   
+   for rr = 0 to mat_rows{
+    for cc = 0 to mat_cols{
+        bs_mat_slice_p = bitsliced_Ll_s[8 * bs_mat_cols * cc : 144];
+        
+        acc_slice_p = bitsliced_M[8 * bs_mat_cols * rr : 144];
+        
+        mat_element = Vdec[rr * mat_cols + cc];
+        
+        for kk = 0 to bs_mat_cols{
+            
+            tmpkl = (32u)mat_element;
+            reg ptr u32[8] acc_more_slice_p;
+            reg ptr u32[8] bsmat_more_slice_p;
+            acc_more_slice_p = acc_slice_p[8 * kk : 8];
+            bsmat_more_slice_p = bs_mat_slice_p[8 * kk : 8];
+            
+            () = #spill(bsmat_more_slice_p, tmpkl);
+           acc_more_slice_p = bitsliced_m_vec_mul_add_2(bsmat_more_slice_p, tmpkl, acc_more_slice_p);
+            () = #unspill(bsmat_more_slice_p, tmpkl);
+            acc_slice_p[8 * kk : 8] = acc_more_slice_p;
+            bs_mat_slice_p[8 * kk : 8] = bsmat_more_slice_p;
+            
+        }   
+       
+        bitsliced_M[8 * bs_mat_cols * rr : 144] = acc_slice_p;   
+    }
+   }
+  
+  // move the Mi from bitsliced to "standard" representation
+
+   inline int iii j idx k idx1;
+ reg u8 tmpu;
+ 
+ for iii = 0 to paramk{
+    Mi = M[iii * paramm * paramo : paramm * paramo];
+    stack u8[paramm] temp_Mi_col;
+    
+    for j = 0 to paramo{
+        idx = iii;
+        idx *= paramo;
+        idx += j;
+
+        temp_Mi_col = unbitslice_m_vec(bitsliced_M[8 * idx : 8], temp_Mi_col);
+
+        for k = 0 to paramm{
+            idx1 = k;
+            idx1 *= paramo;
+            idx1 += j;
+
+            tmpu = temp_Mi_col[k];
+            Mi[idx1] = tmpu;   
+            M[iii * paramm * paramo : paramm * paramo] = Mi;
+        }
+    }
+
+}
+ 
+inline int rv;
+
+for rv = 0 to 2 * paramm * param_A_cols{
+    Amatrix[rv] = 0;
+}
+for rv = 0 to 2 * paramm{
+     yvector[rv] = 0;
+}
+yvector[0 : paramm] = copy_tmat(t_mat);
+
+
+stack u32[(paramn - paramo) * paramk * paramm / 8] bitsliced_Pv;
+
+stack u32[paramk * paramk * paramm / 8] bitsliced_vPv;
+
+bitsliced_Pv =  P1_times_Vt(bitsliced_P1_s, Vdec, bitsliced_Pv);
+
+bitsliced_vPv = mul_add_mat_x_bitsliced_m_mat(Vdec, bitsliced_Pv, bitsliced_vPv);
+
+stack u32[paramk * (paramk + 1) / 2 * paramm / 8] bitsliced_vPv_upper;
+
+bitsliced_vPv_upper = bitsliced_m_upper(bitsliced_vPv, bitsliced_vPv_upper);
+
+
+
+ inline int l ii jj pos; 
+    l = 0;
+    for ii = 0 to paramk{
+        for jj = paramk - 1 downto ii - 1{
+        pos = (ii * paramk + jj - (ii * (ii + 1) / 2));
+        
+
+        stack u8[paramm] temp_y; reg u8 temp3;
+
+        temp_y = unbitslice_m_vec(bitsliced_vPv_upper[ pos * (paramm / 8) : 8], temp_y);
+
+        reg u64 ks ; reg u8 tmpks;
+        ks = 0;
+        while(ks < paramm){
+            tmpks = temp_y[ks];
+            temp3 = 
+            yvector[l + ks];
+            tmpks ^= temp3;
+            yvector[l + ks] = tmpks;
+            ks += 1;
+        }
+         
+        
+        Mj = M[jj * paramm * paramo : 1152];
+ 
+
+       
+        reg u64 r1 c1 tmpo tmpo3; reg u64 tmpo2;stack u8 aux;
+        r1 = 0;
+        while(r1 < paramm){
+            c1 = 0; 
+            while(c1 < paramo){
+
+                tmpo  = r1;
+                tmpo *= paramo;
+                tmpo += c1;
+
+                aux = Mj[tmpo];
+
+                tmpo3  = r1;
+                tmpo3 += l;
+                tmpo3 *= param_A_cols;
+
+                tmpo2 = ii;
+                tmpo2 *= paramo;
+
+                tmpo3 += tmpo2;
+                tmpo3 += c1;
+
+                tmpks = Amatrix[tmpo3];
+
+
+                tmpks ^= aux;
+
+                Amatrix[tmpo3] = tmpks;
+                
+                
+                c1 += 1;
+            }
+            r1 += 1;
+        }
+
+
+        
+        if (ii != jj) {
+                Mi = M[ii * paramm * paramo : paramm * paramo];
+                
+                reg u64 r2 c2;
+                r2 = 0;
+                
+
+                while(r2 < paramm){
+                    c2 = 0;
+                    while(c2 < paramo){
+                        tmpo = r2;
+                        tmpo *= paramo;
+                        tmpo += c2;
+
+                        temp3 = Mi[tmpo];
+
+                        tmpo  = r2;
+                        tmpo += l;
+                        tmpo *= param_A_cols;
+
+                        tmpo2 = jj;
+                        tmpo2 *= paramo;
+
+                        tmpo += tmpo2;
+                        tmpo += c2;
+
+                        tmpks = Amatrix[tmpo];
+                        tmpks ^= temp3;
+                        Amatrix[tmpo] = tmpks;
+
+                        c2 += 1;
+                    }
+                    r2 += 1;
+                }
+
+        }
+        
+        l += 1;
+        }
+    }
+     
+ yvector = reduce_y_mod_fX(yvector);
+
+
+   
+ Amatrix = reduce_A_mod_fX(Amatrix);
+  
+
+   r_start[0 : paramk * paramo] = decode_r(total_v_bytes[paramk * param_v_bytes : param_r_bytes],  r_start[0 : paramk * paramo]);
+   r_start[paramk * paramo] = 0x00;
+
+   
+ 
+   reg u8 val;  
+  
+   val, x = sample_solution(Amatrix, yvector, r_start, x);
+
+
+   if(val == 1){
+    done = 1;
+   } 
+
+
+}
+
+
+inline int i4;
+stack u8[paramn - paramo] vi;
+stack u8[paramn - paramo] Ox;
+stack u8[paramk * paramn] s_sig;
+
+for i4 = 0 to paramk{
+    vi = Vdec[i4 * (paramn - paramo) : (paramn - paramo)];
+
+    Ox = mat_mul_s(mdec, x[i4 * paramo : paramo], Ox);
+
+    s_sig[i4 * paramn : paramn] = mat_add(vi, Ox, s_sig[i4 * paramn : paramn]);
+    
+    s_sig[i4 * paramn + (paramn - paramo): paramo] = copy_paramou8(x[i4 * paramo : paramo]);
+
+}
+
+
+stack u8[(paramk * paramn)/2 + param_salt_bytes] sig_out;
+
+sig_out[0:(paramk * paramn)/2] = encode(s_sig, sig_out[0:(paramk * paramn)/2]);
+
+sig_out[(paramk * paramn)/2 : param_salt_bytes] = copy_24u8(salt_s);
+
+() = #unspill(signed_message);
+inline int iku;
+for iku = 0 to 180{
+   (u8)[signed_message + iku] = sig_out[iku];
+}
+
+
+
+    reg u64 RVAL;
+    RVAL = 0;
+    return RVAL;
+}

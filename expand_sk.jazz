@@ -1,0 +1,189 @@
+//require "values_expand_sk.jazz"
+require "shake256_lib.jazz"
+require "bitsliced_arith.jazz"
+require "sign_functions.jazz"
+require "stream.jazz"
+
+fn mayo_expand_sk(reg ptr u8[24] csk,reg ptr u8[93684] sk)->reg ptr u8[93684]
+{
+     
+    () = #spill(sk, csk);
+    stack u8[MAYO_2_S_bytes] S;    
+    S = __shake256_556_24(S, csk);
+    () = #unspill(sk, csk);
+
+    stack u8[2 * MAYO_2_O_bytes] mdec;
+
+    
+    mdec = decode_o_sign(S[MAYO_2_pk_seed_bytes: MAYO_2_O_bytes], mdec);
+    
+
+     stack u64[2] seed_pk_64;
+      stack u8[MAYO_2_pk_seed_bytes] seed_pk; reg u64 ik;
+      reg u8 auxx;
+      ik = 0;
+   
+  while(ik < MAYO_2_pk_seed_bytes){
+      auxx = S[ik];
+      seed_pk[ik] = auxx;
+      ik+=1;
+  }
+
+seed_pk_64 = #copy_64(seed_pk) ; 
+
+
+stack u32[(MAYO_2_P1_bytes / 4)+(MAYO_2_P2_bytes / 4)] bitsliced_P;
+
+stack u64[(MAYO_2_P1_bytes / 8)+(MAYO_2_P2_bytes / 8)] bitsliced_P_64;
+
+bitsliced_P_64 = aes128ctr(bitsliced_P_64, seed_pk_64);
+bitsliced_P = #copy_64(bitsliced_P_64);
+
+
+reg ptr u32[MAYO_2_P1_bytes / 4] bitsliced_P1_p;
+
+bitsliced_P1_p = bitsliced_P[0 : MAYO_2_P1_bytes / 4];
+
+
+
+   stack u32[(paramn - paramo) * (paramn - paramo) * paramm / 8]  bitsliced_P1_P1t;
+
+
+    
+inline int  mm_legs; reg u64 used; used = 0;
+reg u64 rw cw aux sidx;
+rw = 0;
+
+mm_legs = paramm / 32;
+while(rw < paramv){
+    cw = rw;
+    while(cw < paramv){
+        if(rw == cw){
+            aux = rw;
+            aux *= paramv;
+            aux += cw;
+            aux *= 8;
+             
+            bitsliced_P1_P1t[aux] = 0;
+        }
+        else{
+          sidx = used;
+          sidx *= 8;
+          
+          aux = rw;
+          aux *= paramv;
+          aux += cw;
+          aux *= 8;
+    
+          bitsliced_P1_P1t = bitsliced_m_vec_copy_slice(bitsliced_P1_p, bitsliced_P1_P1t, sidx, aux);
+
+          aux = cw;
+          aux *= paramv;
+          aux += rw;
+          aux *= 8;
+
+          bitsliced_P1_P1t = bitsliced_m_vec_copy_slice(bitsliced_P1_p, bitsliced_P1_P1t, sidx, aux);
+
+
+        }
+        used += 1;
+        cw += 1;
+    }
+        rw += 1;
+}
+
+reg ptr u32[MAYO_2_P2_bytes /4] bitsliced_L_p;
+
+bitsliced_L_p = bitsliced_P[(MAYO_2_P1_bytes / 4) : (MAYO_2_P2_bytes / 4 )];
+
+    
+
+inline int bs_mat_entries_used bs_mat_rows bs_mat_cols r cl triangular mat_cols;
+  
+  reg ptr u64[4] bs_mat_slice_p;
+  reg ptr u8[paramo] mat_slice_p;
+  reg ptr u64[4 * paramo] acc_slice_p;
+ 
+  triangular = 0;
+  bs_mat_entries_used = 0;
+ 
+  bs_mat_rows =  N_MAX - paramo;
+  bs_mat_cols =  N_MAX - paramo;
+  mat_cols = paramo;
+ 
+ 
+  for r = 0 to bs_mat_rows{
+    for cl = triangular*r to bs_mat_cols{
+    
+      bs_mat_slice_p = (bitsliced_P1_P1t[u64 4 * bs_mat_entries_used : 4]);
+     
+      mat_slice_p = (mdec[u8 cl * mat_cols : 18]);
+       
+      acc_slice_p = (bitsliced_L_p[u64 4 * r * mat_cols : 72]);
+      
+     () = #spill(bs_mat_slice_p, mat_slice_p);
+      acc_slice_p = process_k(bs_mat_slice_p, mat_slice_p, acc_slice_p);
+     () = #unspill(bs_mat_slice_p, mat_slice_p);
+
+      bitsliced_L_p[u64 4 * r * mat_cols : 72] = (acc_slice_p);
+
+      bs_mat_entries_used += 1;
+
+    }
+  }
+  
+  //sk_seed + o_bytes + param_P1_bytes + param_P2_bytes
+
+
+  stack u8[93684] sk_s; 
+
+  reg u64 i; reg u8 tmp;
+  i = 0;
+  while(i < MAYO_2_sk_seed_bytes){
+    tmp = csk[i];
+    sk_s[i] = tmp;
+    i += 1;
+  }
+  
+  
+  stack u8[540] Ocpy;
+  reg ptr u8[540] Ocpy_p;
+  Ocpy_p = Ocpy;
+
+
+
+ 
+  Ocpy_p = copy_540u8(S[MAYO_2_pk_seed_bytes: MAYO_2_O_bytes]);
+
+  
+  () = #spill(Ocpy_p);
+  sk_s[MAYO_2_sk_seed_bytes: MAYO_2_O_bytes] = copy_540u8(Ocpy_p);
+  () = #unspill(Ocpy_p);
+   
+
+  stack u8[MAYO_2_P1_bytes] bitsliced_P1_p_8;
+  bitsliced_P1_p_8 = #copy_32(bitsliced_P1_p);
+  sk_s[MAYO_2_sk_seed_bytes + MAYO_2_O_bytes: MAYO_2_P1_bytes] = copy_58560u8(bitsliced_P1_p_8);
+
+ 
+  
+  stack u8[MAYO_2_P2_bytes] bitsliced_L_p_8;
+
+  bitsliced_L_p_8 = #copy_32(bitsliced_L_p);
+
+
+  
+  sk_s[MAYO_2_sk_seed_bytes + MAYO_2_O_bytes + MAYO_2_P1_bytes : MAYO_2_P2_bytes] = copy_34560u8(bitsliced_L_p_8);
+  
+  () = #unspill(sk);
+  i = 0; reg u8 tmpa;
+  while(i < 93684){
+    tmpa = sk_s[i];
+    sk[i] = tmpa;
+    i += 1;
+
+  }
+
+    return sk;
+
+}
