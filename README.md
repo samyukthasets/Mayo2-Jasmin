@@ -3,6 +3,7 @@ Jasmin Implementation of the Mayo Signature scheme
 
 # Compiling and Executing
 
+NIST api is available in the **test_NIST_signverif.c** file and a sample output can be found in **out.txt**.
 To compile the code, run:
 
 ```bash
