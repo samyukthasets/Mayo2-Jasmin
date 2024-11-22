@@ -27,4 +27,5 @@ Benchmarked based on the average of 100,000 runs of the implementation on a **2.
 | Verify    | 480 μsecs              | 665 μsecs                   |
 
 # References
-The details of the implementation can be found at 
+The details of the implementation can be found at [eprint archive 2024/1893](https://eprint.iacr.org/2024/1893).
+
