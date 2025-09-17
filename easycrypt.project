@@ -1,0 +1,4 @@
+[general]
+
+idirs = /home/fv/mulverif
+rdirs = Jasmin:/home/fv/.opam/default/lib/jasmin/easycrypt
